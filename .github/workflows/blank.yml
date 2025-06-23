@@ -1,4 +1,4 @@
-name: 🔐 Free SSH VPS via Ngrok (Final Tested)
+name: 🔐 Free SSH VPS via Ngrok (Stable Final v3)
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: ✅ Install & Setup OpenSSH
+    - name: ✅ Setup SSH Server
       run: |
         sudo apt update
         sudo apt install -y openssh-server curl unzip
@@ -19,34 +19,38 @@ jobs:
         sudo systemctl start ssh
         sudo systemctl restart ssh
 
-    - name: 🌐 Download & Start Ngrok
+    - name: 🌐 Install Ngrok & Start TCP Tunnel
       run: |
         curl -s -L https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip -o ngrok.zip
         unzip ngrok.zip
         chmod +x ngrok
         ./ngrok authtoken 2ytjV8Op4vrrttvTrEJiQLEDi5I_dwsosxpuvCSo4dLqd9P1
-        nohup ./ngrok tcp 22 > /dev/null &
-        sleep 10
+        nohup ./ngrok tcp 22 --log=stdout > ngrok.log 2>&1 &
+        sleep 15
 
-    - name: 📡 Wait & Show SSH Tunnel Info
+    - name: ⏳ Wait for tunnel and show SSH login
       run: |
-        echo "⏳ Waiting for Ngrok tunnel..."
-        for i in {1..10}; do
+        echo "⏳ Waiting for ngrok tunnel to be ready..."
+
+        for i in {1..15}; do
           TUNNEL_URL=$(curl -s http://127.0.0.1:4040/api/tunnels | grep -o 'tcp://[0-9a-zA-Z\.:]*')
           if [[ ! -z "$TUNNEL_URL" ]]; then
+            echo "🎉 Tunnel found!"
             break
           fi
-          sleep 5
+          echo "⌛ Still waiting... ($i)"
+          sleep 4
         done
 
         if [[ -z "$TUNNEL_URL" ]]; then
-          echo "❌ Ngrok tunnel not found. Try again later."
+          echo "❌ Failed to get tunnel from ngrok. Exiting."
+          cat ngrok.log
           exit 1
         fi
 
         echo "=============================="
         echo "✅ SSH VPS IS READY!"
-        echo "🔐 Command to connect:"
+        echo "🔐 SSH Login Command:"
         echo "👉 ssh root@$(echo $TUNNEL_URL | sed 's/tcp:\/\///' | sed 's/:/ -p /')"
         echo "🛡️ Password: password"
         echo "=============================="
