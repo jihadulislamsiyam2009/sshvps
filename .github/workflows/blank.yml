@@ -1,4 +1,4 @@
-name: Free SSH VPS via GitHub Actions 🚀
+name: Free SSH VPS with Ngrok (Manual Install)
 
 on: 
   workflow_dispatch:
@@ -8,10 +8,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Install & Start SSH Server 🔐
+    - name: Setup SSH Server 🔐
       run: |
         sudo apt update
-        sudo apt install -y openssh-server curl
+        sudo apt install -y openssh-server curl unzip
         sudo systemctl enable ssh
         sudo systemctl start ssh
         echo "root:password" | sudo chpasswd
@@ -19,16 +19,16 @@ jobs:
         sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
         sudo systemctl restart ssh
 
-    - name: Install Ngrok & Setup Tunnel 🌐
+    - name: Download & Setup Ngrok Manually 🌐
       run: |
-        curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
-        echo "deb https://ngrok.agent.download/deb stable main" | sudo tee /etc/apt/sources.list.d/ngrok.list
-        sudo apt update && sudo apt install ngrok -y
+        curl -s -L -o ngrok.zip https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-stable-linux-amd64.zip
+        unzip ngrok.zip
+        sudo mv ngrok /usr/local/bin
         ngrok config add-authtoken 2ytjV8Op4vrrttvTrEJiQLEDi5I_dwsosxpuvCSo4dLqd9P1
         nohup ngrok tcp 22 > ngrok.log &
         sleep 10
 
-    - name: Show SSH Command 🧾
+    - name: Show SSH Command 📢
       run: |
         echo "============================"
         echo "🔑 SSH LOGIN DETAILS:"
