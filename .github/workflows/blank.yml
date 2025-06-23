@@ -1,14 +1,14 @@
-name: Free VPS via SSH and Ngrok
+name: 🔐 Free VPS via SSH (Ngrok)
 
-on: 
+on:
   workflow_dispatch:
 
 jobs:
-  ssh-vps:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Set up SSH server
+    - name: ✅ Setup SSH Server
       run: |
         sudo apt update
         sudo apt install -y openssh-server curl unzip
@@ -17,23 +17,23 @@ jobs:
         echo "root:password" | sudo chpasswd
         sudo sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
         sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
-        sudo service ssh restart
+        sudo systemctl restart ssh
 
-    - name: Download & Setup Ngrok from ZIP (Manual Way)
+    - name: 🌐 Download & Start Ngrok
       run: |
-        wget https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip -O ngrok.zip
+        curl -s -L https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip -o ngrok.zip
         unzip ngrok.zip
         chmod +x ngrok
-        sudo mv ngrok /usr/local/bin
-        ngrok config add-authtoken 2ytjV8Op4vrrttvTrEJiQLEDi5I_dwsosxpuvCSo4dLqd9P1
-        nohup ngrok tcp 22 &
-
-    - name: Show SSH login command
-      run: |
+        ./ngrok authtoken 2ytjV8Op4vrrttvTrEJiQLEDi5I_dwsosxpuvCSo4dLqd9P1
+        nohup ./ngrok tcp 22 > ngrok.log &
         sleep 10
+
+    - name: 📢 Show SSH Login Info
+      run: |
+        echo "⏳ Fetching SSH tunnel info..."
         curl -s http://127.0.0.1:4040/api/tunnels > tunnel.json
         echo "=============================="
-        echo "🔑 SSH Login Command:"
+        echo "🔑 SSH LOGIN COMMAND:"
         cat tunnel.json | grep -o 'tcp://[0-9a-zA-Z\.:]*' | sed 's/tcp:\/\///' | while read line; do
           echo "👉 ssh root@$(echo $line | sed 's/:/ -p /')"
         done
