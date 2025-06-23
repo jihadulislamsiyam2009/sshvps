@@ -1,56 +1,51 @@
-name: 🔐 Free SSH VPS via Ngrok (Stable Final v3)
+name: SSH VPS via Ngrok
 
 on:
   workflow_dispatch:
 
 jobs:
-  deploy:
+  start-ssh-vps:
     runs-on: ubuntu-latest
 
     steps:
-    - name: ✅ Setup SSH Server
-      run: |
-        sudo apt update
-        sudo apt install -y openssh-server curl unzip
-        echo "root:password" | sudo chpasswd
-        sudo sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
-        sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
-        sudo systemctl enable ssh
-        sudo systemctl start ssh
-        sudo systemctl restart ssh
+      - name: Install OpenSSH and tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openssh-server curl unzip
+          echo "root:password" | sudo chpasswd
+          sudo sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+          sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
+          sudo systemctl enable ssh
+          sudo systemctl restart ssh
 
-    - name: 🌐 Install Ngrok & Start TCP Tunnel
-      run: |
-        curl -s -L https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip -o ngrok.zip
-        unzip ngrok.zip
-        chmod +x ngrok
-        ./ngrok authtoken 2ytjV8Op4vrrttvTrEJiQLEDi5I_dwsosxpuvCSo4dLqd9P1
-        nohup ./ngrok tcp 22 --log=stdout > ngrok.log 2>&1 &
-        sleep 15
+      - name: Download and Setup Ngrok
+        run: |
+          curl -s -L https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip -o ngrok.zip
+          unzip ngrok.zip
+          chmod +x ngrok
+          ./ngrok authtoken 2ytjV8Op4vrrttvTrEJiQLEDi5I_dwsosxpuvCSo4dLqd9P1
+          nohup ./ngrok tcp 22 > ngrok.log 2>&1 &
 
-    - name: ⏳ Wait for tunnel and show SSH login
-      run: |
-        echo "⏳ Waiting for ngrok tunnel to be ready..."
+      - name: Wait for Ngrok tunnel
+        run: |
+          for i in {1..20}; do
+            sleep 3
+            TUNNEL_URL=$(curl -s http://127.0.0.1:4040/api/tunnels | grep -o 'tcp://[0-9a-zA-Z\.:]*' || true)
+            if [[ ! -z "$TUNNEL_URL" ]]; then
+              echo "Ngrok tunnel is ready: $TUNNEL_URL"
+              break
+            fi
+            echo "Waiting for ngrok tunnel ($i)..."
+          done
 
-        for i in {1..15}; do
-          TUNNEL_URL=$(curl -s http://127.0.0.1:4040/api/tunnels | grep -o 'tcp://[0-9a-zA-Z\.:]*')
-          if [[ ! -z "$TUNNEL_URL" ]]; then
-            echo "🎉 Tunnel found!"
-            break
+          if [[ -z "$TUNNEL_URL" ]]; then
+            echo "Failed to establish ngrok tunnel"
+            cat ngrok.log
+            exit 1
           fi
-          echo "⌛ Still waiting... ($i)"
-          sleep 4
-        done
 
-        if [[ -z "$TUNNEL_URL" ]]; then
-          echo "❌ Failed to get tunnel from ngrok. Exiting."
-          cat ngrok.log
-          exit 1
-        fi
-
-        echo "=============================="
-        echo "✅ SSH VPS IS READY!"
-        echo "🔐 SSH Login Command:"
-        echo "👉 ssh root@$(echo $TUNNEL_URL | sed 's/tcp:\/\///' | sed 's/:/ -p /')"
-        echo "🛡️ Password: password"
-        echo "=============================="
+          echo "======================="
+          echo "SSH Command:"
+          echo "ssh root@$(echo $TUNNEL_URL | sed 's/tcp:\/\///' | sed 's/:/ -p /')"
+          echo "Password: password"
+          echo "======================="
