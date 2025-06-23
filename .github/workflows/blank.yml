@@ -1,4 +1,4 @@
-name: 🔐 Free VPS via SSH (Ngrok)
+name: 🔐 Free SSH VPS via Ngrok (Final Tested)
 
 on:
   workflow_dispatch:
@@ -8,15 +8,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: ✅ Setup SSH Server
+    - name: ✅ Install & Setup OpenSSH
       run: |
         sudo apt update
         sudo apt install -y openssh-server curl unzip
-        sudo systemctl enable ssh
-        sudo systemctl start ssh
         echo "root:password" | sudo chpasswd
         sudo sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
         sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
+        sudo systemctl enable ssh
+        sudo systemctl start ssh
         sudo systemctl restart ssh
 
     - name: 🌐 Download & Start Ngrok
@@ -25,17 +25,28 @@ jobs:
         unzip ngrok.zip
         chmod +x ngrok
         ./ngrok authtoken 2ytjV8Op4vrrttvTrEJiQLEDi5I_dwsosxpuvCSo4dLqd9P1
-        nohup ./ngrok tcp 22 > ngrok.log &
+        nohup ./ngrok tcp 22 > /dev/null &
         sleep 10
 
-    - name: 📢 Show SSH Login Info
+    - name: 📡 Wait & Show SSH Tunnel Info
       run: |
-        echo "⏳ Fetching SSH tunnel info..."
-        curl -s http://127.0.0.1:4040/api/tunnels > tunnel.json
-        echo "=============================="
-        echo "🔑 SSH LOGIN COMMAND:"
-        cat tunnel.json | grep -o 'tcp://[0-9a-zA-Z\.:]*' | sed 's/tcp:\/\///' | while read line; do
-          echo "👉 ssh root@$(echo $line | sed 's/:/ -p /')"
+        echo "⏳ Waiting for Ngrok tunnel..."
+        for i in {1..10}; do
+          TUNNEL_URL=$(curl -s http://127.0.0.1:4040/api/tunnels | grep -o 'tcp://[0-9a-zA-Z\.:]*')
+          if [[ ! -z "$TUNNEL_URL" ]]; then
+            break
+          fi
+          sleep 5
         done
+
+        if [[ -z "$TUNNEL_URL" ]]; then
+          echo "❌ Ngrok tunnel not found. Try again later."
+          exit 1
+        fi
+
+        echo "=============================="
+        echo "✅ SSH VPS IS READY!"
+        echo "🔐 Command to connect:"
+        echo "👉 ssh root@$(echo $TUNNEL_URL | sed 's/tcp:\/\///' | sed 's/:/ -p /')"
         echo "🛡️ Password: password"
         echo "=============================="
