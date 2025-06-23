@@ -1,24 +1,31 @@
-name: SSH VPS via Ngrok
+name: vps
 
 on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
-  start-ssh-vps:
+  run-vps:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Install OpenSSH and tools
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install SSH server and dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y openssh-server curl unzip
+          sudo apt update
+          sudo apt install -y openssh-server curl unzip
           echo "root:password" | sudo chpasswd
           sudo sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
           sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
           sudo systemctl enable ssh
           sudo systemctl restart ssh
 
-      - name: Download and Setup Ngrok
+      - name: Download and run ngrok
         run: |
           curl -s -L https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip -o ngrok.zip
           unzip ngrok.zip
@@ -26,26 +33,26 @@ jobs:
           ./ngrok authtoken 2ytjV8Op4vrrttvTrEJiQLEDi5I_dwsosxpuvCSo4dLqd9P1
           nohup ./ngrok tcp 22 > ngrok.log 2>&1 &
 
-      - name: Wait for Ngrok tunnel
+      - name: Wait for ngrok tunnel to be ready
         run: |
           for i in {1..20}; do
             sleep 3
             TUNNEL_URL=$(curl -s http://127.0.0.1:4040/api/tunnels | grep -o 'tcp://[0-9a-zA-Z\.:]*' || true)
             if [[ ! -z "$TUNNEL_URL" ]]; then
-              echo "Ngrok tunnel is ready: $TUNNEL_URL"
+              echo "Ngrok tunnel ready: $TUNNEL_URL"
               break
             fi
             echo "Waiting for ngrok tunnel ($i)..."
           done
 
           if [[ -z "$TUNNEL_URL" ]]; then
-            echo "Failed to establish ngrok tunnel"
+            echo "Failed to get ngrok tunnel."
             cat ngrok.log
             exit 1
           fi
 
-          echo "======================="
-          echo "SSH Command:"
+          echo "============================"
+          echo "SSH Access Ready!"
           echo "ssh root@$(echo $TUNNEL_URL | sed 's/tcp:\/\///' | sed 's/:/ -p /')"
           echo "Password: password"
-          echo "======================="
+          echo "============================"
