@@ -1,14 +1,14 @@
-name: Free SSH VPS with Ngrok (Manual Install)
+name: Free VPS via SSH and Ngrok
 
 on: 
   workflow_dispatch:
 
 jobs:
-  build:
+  ssh-vps:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Setup SSH Server 🔐
+    - name: Set up SSH server
       run: |
         sudo apt update
         sudo apt install -y openssh-server curl unzip
@@ -17,22 +17,25 @@ jobs:
         echo "root:password" | sudo chpasswd
         sudo sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
         sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
-        sudo systemctl restart ssh
+        sudo service ssh restart
 
-    - name: Download & Setup Ngrok Manually 🌐
+    - name: Download & Setup Ngrok from ZIP (Manual Way)
       run: |
-        curl -s -L -o ngrok.zip https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-stable-linux-amd64.zip
+        wget https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip -O ngrok.zip
         unzip ngrok.zip
+        chmod +x ngrok
         sudo mv ngrok /usr/local/bin
         ngrok config add-authtoken 2ytjV8Op4vrrttvTrEJiQLEDi5I_dwsosxpuvCSo4dLqd9P1
-        nohup ngrok tcp 22 > ngrok.log &
-        sleep 10
+        nohup ngrok tcp 22 &
 
-    - name: Show SSH Command 📢
+    - name: Show SSH login command
       run: |
-        echo "============================"
-        echo "🔑 SSH LOGIN DETAILS:"
-        curl -s http://127.0.0.1:4040/api/tunnels | grep -o 'tcp://[0-9a-zA-Z\.:]*' | sed 's/tcp:\/\///' > ssh.txt
-        cat ssh.txt | while read line; do echo "👉 ssh root@$(echo $line | sed 's/:/ -p /')"; done
+        sleep 10
+        curl -s http://127.0.0.1:4040/api/tunnels > tunnel.json
+        echo "=============================="
+        echo "🔑 SSH Login Command:"
+        cat tunnel.json | grep -o 'tcp://[0-9a-zA-Z\.:]*' | sed 's/tcp:\/\///' | while read line; do
+          echo "👉 ssh root@$(echo $line | sed 's/:/ -p /')"
+        done
         echo "🛡️ Password: password"
-        echo "============================"
+        echo "=============================="
